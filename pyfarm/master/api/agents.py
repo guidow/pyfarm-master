@@ -30,7 +30,7 @@ except ImportError:
 
 from functools import partial
 
-from flask import Response, request
+from flask import Response, request, url_for
 from flask.views import MethodView
 
 from pyfarm.core.logger import getLogger
@@ -349,7 +349,9 @@ class AgentIndexAPI(MethodView):
             q = q.filter(Agent.cpus <= request.args.get("max_cpus", type=int))
 
         for agent_id, hostname in q:
-            out.append({"id": agent_id, "hostname": hostname})
+            out.append({"id": agent_id,
+                        "hostname": hostname,
+                        "href": url_for('.single_agent_api', agent_id=agent_id)})
 
         return jsonify(out), OK
 
