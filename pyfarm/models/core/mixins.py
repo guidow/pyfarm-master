@@ -154,39 +154,34 @@ class UtilityMixins(object):
         to a standard value.  In the event this method does not know
         how to unpack a relationship it will raise a ``NotImplementedError``
         """
-        values = []
-        iterable = getattr(self, name)
+        relation = getattr(self, name)
 
-        # nothing else to do here
-        if iterable is None:
+        # Nothing else to do here
+        if relation is None:
             return
 
-        # If isinstance(iterable, sqlalchemy.orm.dyanmic.AppenderBaseQuery)
-        # then use all() to pull the data we need.  We can't test using that
-        # class directly however because it doesn't actually exist so we
-        # have to test the base types instead.
-        if isinstance(iterable, AppenderMixin) \
-                and isinstance(iterable, BaseQuery):
-            iterable = iterable.all()
+        if getattr(relation, "column_descriptions", None):
+            out = []
+            for relationship in relation:
+                if name == "tags":
+                    out.append(relationship.tag)
+                elif name == "projects":
+                    out.append(relationship.name)
+                elif name == "software":
+                    out.append(relationship.name)
+                elif name == "software_versions":
+                    out.append({"id": relationship.id,
+                                "version": relationship.version,
+                                "rank": relationship.rank})
+                elif name in ("tasks", "jobs", "agents"):
+                    out.append(relationship.id)
+                else:
+                    raise NotImplementedError(
+                        "don't know how to unpack relationships for `%s`" % name)
+        else:
+            out = relation.to_dict()
 
-        for relationship in iterable:
-            if name == "tags":
-                values.append(relationship.tag)
-            elif name == "projects":
-                values.append(relationship.name)
-            elif name == "software":
-                values.append(relationship.name)
-            elif name == "software_versions":
-                values.append({"id": relationship.id,
-                               "version": relationship.version,
-                               "rank": relationship.rank})
-            elif name in ("tasks", "jobs", "agents"):
-                values.append(relationship.id)
-            else:
-                raise NotImplementedError(
-                    "don't know how to unpack relationships for `%s`" % name)
-
-        return values
+        return out
 
     def to_dict(self):
         """Produce a dictionary of existing data in the table"""
