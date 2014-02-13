@@ -302,9 +302,6 @@ class SingleSoftwareAPI(MethodView):
                             invalid columns being included)
         """
         if isinstance(software_rq, STRING_TYPES):
-            if g.json["software"] != software_rq:
-                return jsonify(error="""The name of the software must be equal
-                               to the one in the URI."""), BAD_REQUEST
             software = Software.query.filter_by(software=software_rq).first()
         else:
             software = Software.query.filter_by(id=software_rq).first()
