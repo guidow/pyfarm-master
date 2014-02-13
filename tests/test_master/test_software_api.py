@@ -177,6 +177,37 @@ class TestSoftwareAPI(BaseTestCase):
                                 ]
                             })
 
+    def test_software_put_wrong_name(self):
+        response1 = self.client.put(
+            "/api/v1/software/foo",
+            content_type="application/json",
+            data=dumps({
+                        "software": "bar",
+                        "versions": [
+                                {"version": "1.0"}
+                            ]
+                       }))
+        self.assert_bad_request(response1)
+
+    def test_list_software(self):
+        response1 = self.client.put(
+            "/api/v1/software/foo",
+            content_type="application/json",
+            data=dumps({
+                        "software": "foo"
+                       }))
+        self.assert_created(response1)
+        id = response1.json['id']
+
+        response2 = self.client.get("/api/v1/software/")
+        self.assert_ok(response2)
+        self.assertEqual(
+            response2.json, [{
+                            "id": id,
+                            "software": "foo",
+                            "versions": []
+                            }])
+
     def test_software_delete(self):
         response1 = self.client.put(
             "/api/v1/software/foo",
@@ -237,6 +268,75 @@ class TestSoftwareAPI(BaseTestCase):
                             ]
                             })
 
+    def test_unknown_software_post_version(self):
+        response1 = self.client.post(
+            "/api/v1/software/foo/versions/",
+            content_type="application/json",
+            data=dumps({"version": "1.0"}))
+        self.assert_not_found(response1)
+
+    def test_software_put_broken_version(self):
+        response1 = self.client.put(
+            "/api/v1/software/foo",
+            content_type="application/json",
+            data=dumps({
+                "software": "foo",
+                            "versions": "1.0"
+                       }))
+        self.assert_bad_request(response1)
+
+        response2 = self.client.put(
+            "/api/v1/software/foo",
+            content_type="application/json",
+            data=dumps({
+                "software": "foo",
+                            "versions": ["1.0"]
+                       }))
+        self.assert_bad_request(response2)
+
+        response3 = self.client.put(
+            "/api/v1/software/foo",
+            content_type="application/json",
+            data=dumps({
+                "software": "foo",
+                            "versions": 
+                                [
+                                    {"version": 1.0}
+                                ]
+                       }))
+        self.assert_bad_request(response3)
+
+        response4 = self.client.put(
+            "/api/v1/software/foo",
+            content_type="application/json",
+            data=dumps({
+                "software": "foo",
+                            "versions":
+                                [
+                                    {
+                                        "version": "1.0",
+                                        "rank": "100"
+                                    }
+                                ]
+                       }))
+        self.assert_bad_request(response4)
+
+        response5 = self.client.put(
+            "/api/v1/software/foo",
+            content_type="application/json",
+            data=dumps({
+                "software": "foo",
+                            "versions":
+                                [
+                                    {
+                                        "version": "1.0",
+                                        "rank": 100,
+                                        "foo": "bar"
+                                    }
+                                ]
+                       }))
+        self.assert_bad_request(response5)
+
     def test_software_get_versions(self):
         response1 = self.client.put(
             "/api/v1/software/foo",
@@ -285,3 +385,13 @@ class TestSoftwareAPI(BaseTestCase):
 
         response3 = self.client.get("/api/v1/software/foo/versions/1.0")
         self.assert_not_found(response3)
+
+        response4 = self.client.delete("/api/v1/software/foo/versions/1.0")
+        self.assert_no_content(response4)
+
+        response5 = self.client.get("/api/v1/software/foo/versions/1.0")
+        self.assert_not_found(response5)
+
+    def test_software_delete_version_not_found(self):
+        response1 = self.client.delete("/api/v1/software/foo/versions/1.0")
+        self.assert_not_found(response1)
