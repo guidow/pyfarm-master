@@ -325,7 +325,10 @@ class SingleSoftwareAPI(MethodView):
         if "versions" in g.json:
             software.versions = []
             db.session.flush()
-            versions = extract_version_dicts(g.json)
+            try:
+                versions = extract_version_dicts(g.json)
+            except VersionParseError as e:
+                return jsonify(error=e.args), BAD_REQUEST
             current_rank = 100
             for version_dict in versions:
                 version_dict.setdefault("rank", current_rank)
