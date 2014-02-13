@@ -64,7 +64,7 @@ def extract_version_dicts(json_in):
         version = {"version": software_obj["version"]}
         if "rank" in software_obj:
             if not isinstance(software_obj["rank"], int):
-                raise VersionParseError("Software rank must be an int.")
+                raise VersionParseError("Version rank must be an int.")
             version["rank"] = software_obj["rank"]
         if ((len(software_obj) > 2 and "rank" in software_obj) or
             (len(software_obj) > 1 and "rank" not in software_obj)):
