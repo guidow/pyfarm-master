@@ -34,14 +34,25 @@ from flask.views import MethodView
 
 from sqlalchemy import or_
 
+from voluptuous import Schema, Required, All, Length, Range
+
 from pyfarm.core.logger import getLogger
 from pyfarm.core.enums import STRING_TYPES
 from pyfarm.models.software import JobTypeSoftwareRequirement
 from pyfarm.models.jobtype import JobType
 from pyfarm.master.application import db
-from pyfarm.master.utility import jsonify, validate_with_model
+from pyfarm.master.utility import jsonify, validate_with_model, validate_json
 
 logger = getLogger("api.jobtypes")
+
+voluptuous_schema = Schema({
+    "batch_contiguous": bool,
+    "classname": All(str, Length(min=1, max=64)),
+    "code": str,
+    "description": str,
+    "max_batch": int,
+    "name": All(str, Length(min=1, max=64)),
+    "sha1": str})
 
 
 def schema():
@@ -261,7 +272,7 @@ class SingleJobTypeAPI(MethodView):
     @validate_with_model(JobType, ignore=("sha1",), disallow=("jobs",))
     def put(self, jobtype_name):
         """
-        A ``PUT`` to this endpoint will create a new jobtag under the given URI.
+        A ``PUT`` to this endpoint will create a new jobtype under the given URI.
         If a jobtype already exists under that URI, it will be deleted, then
         recreated.
 
@@ -330,6 +341,88 @@ class SingleJobTypeAPI(MethodView):
         logger.info("created jobtype %s in put: %r", jobtype.name, jobtype_data)
 
         return jsonify(jobtype_data), CREATED
+
+    @validate_json(voluptuous_schema)
+    def post(self, jobtype_name):
+        """
+        A ``POST`` to this endpoint will update the specified jobtype.  Only the
+        keys specified in the request body will be updated, the rest will be left
+        as they are.
+
+        .. http:post:: /api/v1/jobtypes/<str:jobtype_name> HTTP/1.1
+
+            **Request**
+
+            .. sourcecode:: http
+
+                POST /api/v1/jobtypes/TestJobType HTTP/1.1
+                Accept: application/json
+
+                {
+                    "name": "TestJobType",
+                    "description": "Updated jobtype for testing inserts and "
+                                   "queries"
+                }
+
+            **Response**
+
+            .. sourcecode:: http
+
+                HTTP/1.1 200 OK
+                Content-Type: application/json
+
+                {
+                    "batch_contiguous": true,
+                    "classname": null,
+                    "description": "Updated jobtype for testing inserts and "
+                                   "queries",
+                    "code": "\nfrom pyfarm.jobtypes.core.jobtype import "
+                            "JobType\n\nclass TestJobType(JobType):\n"
+                            "    def get_command(self):\n"
+                            "        return \"/usr/bin/touch\"\n\n"
+                            "    def get_arguments(self):\n"
+                            "           return [os.path.join("
+                            "self.assignment_data[\"job\"][\"data\"][\"path\"], "
+                            "\"%04d\" % self.assignment_data[\"tasks\"]"
+                            "[0][\"frame\"])]\n",
+                    "id": 1,
+                    "jobs": [],
+                    "max_batch": 1,
+                    "name": "TestJobType", 
+                    "sha1": "849d564da815f8bdfd9de0aaf4ac4fe6e9013015",
+                    "software_requirements": []
+                }
+
+        :statuscode 200: the jobtype was updated
+        :statuscode 400: there was something wrong with the request (such as
+                            invalid columns being included)
+        :statuscode 404: the specified jobtype does not exist
+        """
+        if isinstance(jobtype_name, STRING_TYPES):
+            jobtype = JobType.query.filter(
+                or_(JobType.name == jobtype_name,
+                    JobType.sha1 == jobtype_name)).first()
+        else:
+            jobtype = JobType.query.filter_by(id=jobtype_name).first()
+
+        if not jobtype:
+            return jsonify(error="Jobtype not found"), NOT_FOUND
+
+        for name in JobType.types().columns:
+            if name in g.json:
+                setattr(jobtype, name, g.json[name])
+
+        db.session.add(jobtype)
+        db.session.commit()
+        logger.info("updated jobtype %s: %r", jobtype.name, g.json)
+
+        jobtype_data = jobtype.to_dict()
+        # For some reason, sqlalchemy sometimes returns this column as bytes
+        # instead of string.  jsonify cannot decode that.
+        if PY3 and isinstance(jobtype_data["code"], bytes):
+            jobtype_data["code"] = jobtype_data["code"].decode()
+
+        return jsonify(jobtype_data), OK
 
     def delete(self, jobtype_name):
         """
