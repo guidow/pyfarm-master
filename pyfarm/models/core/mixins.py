@@ -154,42 +154,50 @@ class UtilityMixins(object):
         to a standard value.  In the event this method does not know
         how to unpack a relationship it will raise a ``NotImplementedError``
         """
-        values = []
-        iterable = getattr(self, name)
+        relation = getattr(self.__class__, name)
+        relation_object = getattr(self, name)
 
-        # nothing else to do here
-        if iterable is None:
+        if relation_object is None:
             return
 
-        # If isinstance(iterable, sqlalchemy.orm.dyanmic.AppenderBaseQuery)
-        # then use all() to pull the data we need.  We can't test using that
-        # class directly however because it doesn't actually exist so we
-        # have to test the base types instead.
-        if isinstance(iterable, AppenderMixin) \
-                and isinstance(iterable, BaseQuery):
-            iterable = iterable.all()
-
-        for relationship in iterable:
-            if name == "tags":
-                values.append(relationship.tag)
-            elif name == "projects":
-                values.append(relationship.name)
-            elif name == "software":
-                values.append(relationship.name)
-            elif name == "software_versions":
-                values.append({"id": relationship.id,
-                               "version": relationship.version,
-                               "rank": relationship.rank})
-            elif name in ("tasks", "jobs", "agents"):
-                values.append(relationship.id)
+        if relation.property.uselist:
+            out = []
+            for relationship in relation_object:
+                if name == "tags":
+                    out.append(relationship.tag)
+                elif name == "projects":
+                    out.append(relationship.name)
+                elif name == "software":
+                    out.append(relationship.name)
+                elif name == "versions":
+                    out.append({"id": relationship.id,
+                                "version": relationship.version,
+                                "rank": relationship.rank})
+                elif name in ("tasks", "jobs", "agents"):
+                    out.append(relationship.id)
+                else:
+                    raise NotImplementedError(
+                        "don't know how to unpack relationships for `%s`" % name)
+        else:
+            if name == "software":
+                out = {"software": relation_object.software,
+                       "id":  relation_object.id}
             else:
                 raise NotImplementedError(
                     "don't know how to unpack relationships for `%s`" % name)
 
-        return values
+        return out
 
-    def to_dict(self):
-        """Produce a dictionary of existing data in the table"""
+    def to_dict(self, unpack_relationships=True):
+        """
+        Produce a dictionary of existing data in the table
+
+        :type unpack_relationships: list, tuple, set, bool
+        :param unpack_relationships:
+            If ``True`` then unpack all relationships.  If
+            ``unpack_relationships`` is an iterable such as a list or
+            tuple object then only unpack those relationships.
+        """
         if not isinstance(self.DICT_CONVERT_COLUMN, dict):
             raise TypeError(
                 "expected %s.DICT_CONVERT_COLUMN to "
@@ -213,8 +221,19 @@ class UtilityMixins(object):
             else:
                 results[name] = converter(name)
 
-        # now convert all of the relationships
-        for name in types.relationships:
+        # unpack all relationships
+        if unpack_relationships is True:
+            relationships = types.relationships
+
+        # unpack the intersection of the requested relationships
+        # and the real relationships
+        elif isinstance(unpack_relationships, (list, set, tuple)):
+            relationships = set(unpack_relationships) & types.relationships
+
+        else:
+            relationships = set()
+
+        for name in relationships:
             converter = self.DICT_CONVERT_COLUMN.get(
                 name, self._to_dict_relationship)
 
