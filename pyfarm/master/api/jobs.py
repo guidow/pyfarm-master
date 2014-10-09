@@ -338,7 +338,7 @@ class JobIndexAPI(MethodView):
             user = User.query.filter_by(username=username).first()
             if not user:
                 return (jsonify(
-                    error="User %s not found" % entry["username"]), NOT_FOUND)
+                    error="User %s not found" % username), NOT_FOUND)
 
         g.json.pop("start", None)
         g.json.pop("end", None)
@@ -698,7 +698,7 @@ class SingleJobAPI(MethodView):
             user = User.query.filter_by(username=username).first()
             if not user:
                 return (jsonify(
-                    error="User %s not found" % entry["username"]), NOT_FOUND)
+                    error="User %s not found" % username), NOT_FOUND)
             job.user = user
 
         if "time_started" in g.json:
