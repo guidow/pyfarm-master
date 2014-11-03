@@ -18,24 +18,24 @@
       <td>
         Submitted
       </td>
-      <td>
-        {{ job.time_submitted.strftime('%Y-%m-%d %H:%M:%S UTC') if job.time_submitted }}
+      <td class="timestamp">
+        {{ job.time_submitted.strftime('%Y-%m-%d %H:%M:%S') if job.time_submitted }}
       </td>
     </tr>
     <tr>
       <td>
         Started
       </td>
-      <td>
-        {{ job.time_started.strftime('%Y-%m-%d %H:%M:%S UTC') if job.time_started }}
+      <td class="timestamp">
+        {{ job.time_started.strftime('%Y-%m-%d %H:%M:%S') if job.time_started }}
       </td>
     </tr>
     <tr>
       <td>
         Finished
       </td>
-      <td>
-        {{ job.time_finished.strftime('%Y-%m-%d %H:%M:%S UTC') if job.time_finished}}
+      <td class="timestamp">
+        {{ job.time_finished.strftime('%Y-%m-%d %H:%M:%S') if job.time_finished}}
       </td>
     </tr>
     <tr>
