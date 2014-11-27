@@ -39,9 +39,10 @@ from sqlalchemy.sql import func, or_, and_
 
 from pyfarm.core.config import read_env_bool
 from pyfarm.core.logger import getLogger
-from pyfarm.core.enums import STRING_TYPES, NUMERIC_TYPES, WorkState
+from pyfarm.core.enums import STRING_TYPES, NUMERIC_TYPES, WorkState, _WorkState
 from pyfarm.scheduler.tasks import (
-    assign_tasks_to_agent, assign_tasks, send_job_completion_mail, delete_job)
+    assign_tasks_to_agent, assign_tasks, send_job_completion_mail, delete_job,
+    update_job_state)
 from pyfarm.models.core.cfg import (
     MAX_JOBTYPE_LENGTH, MAX_USERNAME_LENGTH, MAX_JOBQUEUE_NAME_LENGTH)
 from pyfarm.models.jobtype import JobType, JobTypeVersion
@@ -1097,6 +1098,8 @@ class JobSingleTaskAPI(MethodView):
         logger.info("Task %s of job %s has been updated, new data: %r",
                     task_id, task.job.title, task_data)
 
+        # If the agent that was working on this task is now idle, start a
+        # scheduler run for it.
         if task.agent:
             agent = task.agent
             task_count = Task.query.filter(
@@ -1106,6 +1109,21 @@ class JobSingleTaskAPI(MethodView):
                         order_by(Task.job_id, Task.frame).count()
             if task_count == 0:
                 assign_tasks_to_agent.delay(agent.id)
+
+        # If the updates for the last two tasks come in simultaneously, the job
+        # may not get its state updated appropriately, at least when running
+        # on PostgreSQL. (Behavior on MySQL is not known.)
+        # Essentially, the default transaction isolation level of
+        # "read committed" is not sufficient for catching those problems, but
+        # increasing it to "serializable", while fixing this particular problem,
+        # causes too many transactions to fail.
+        #
+        # See discussion under
+        # https://groups.google.com/a/pyfarm.net/forum/#!msg/discuss/M9XM5CeVKbQ/qDglXRyJPJ8J
+        #
+        # The following is a hack-ish work-around for that.
+        if task.state in [_WorkState.DONE, _WorkState.FAILED]:
+            update_job_state.apply_async(args=[task.job_id], countdown=0.1)
 
         return jsonify(task_data), OK
 

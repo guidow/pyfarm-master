@@ -581,3 +581,38 @@ def clean_up_orphaned_task_logs():
         if e.errno != ENOENT:
             raise
         logger.warning("Log directory %r does not exist", LOGFILES_DIR)
+
+
+@celery_app.task(ignore_results=True)
+def update_job_state(job_id):
+    db.session.commit()
+
+    job = Job.query.filter_by(id=job_id).first()
+    if not job:
+        raise KeyError("No job with id %s" % job_id)
+
+    num_active_tasks = db.session.query(Task).\
+        filter(Task.job == job,
+               or_(Task.state == None, and_(
+                        Task.state != WorkState.DONE,
+                        Task.state != WorkState.FAILED))).count()
+
+    if num_active_tasks == 0:
+        num_failed_tasks = Task.query.filter(
+            Task.job == job,
+            Task.state == WorkState.FAILED).count()
+        if num_failed_tasks == 0:
+            if job.state != _WorkState.DONE:
+                logger.info("Job %s: state transition %r -> 'done'",
+                            job.title, job.state)
+                job.state = WorkState.DONE
+                send_job_completion_mail.delay(job.id, True)
+                db.session.add(job)
+        elif job.state != _WorkState.FAILED:
+            logger.info("Job %s: state transition %r -> 'failed'",
+                        job.title, job.state)
+            job.state = WorkState.FAILED
+            send_job_completion_mail.delay(job.id, False)
+            db.session.add(job)
+
+    db.session.commit()
