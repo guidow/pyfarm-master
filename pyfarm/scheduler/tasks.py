@@ -492,7 +492,7 @@ def delete_task(self, task_id):
                         job.id, job.title)
             db.session.delete(job)
         else:
-            # Another workaround for unsufficient transaction isolation
+            # Another workaround for insufficient transaction isolation
             check_to_be_deleted_job.apply_async(args=[job.id], countdown=0.1)
 
     db.session.commit()
