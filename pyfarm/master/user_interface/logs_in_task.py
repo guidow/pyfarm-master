@@ -17,9 +17,9 @@
 from os.path import join, realpath, isfile
 
 try:
-    from httplib import NOT_FOUND, TEMPORARY_REDIRECT
+    from httplib import NOT_FOUND, TEMPORARY_REDIRECT, BAD_REQUEST
 except ImportError:  # pragma: no cover
-    from http.client import NOT_FOUND, TEMPORARY_REDIRECT
+    from http.client import NOT_FOUND, TEMPORARY_REDIRECT, BAD_REQUEST
 
 from flask import render_template, redirect
 
